@@ -2,14 +2,14 @@
 	subtitle search for addic7ed.com (English ONLY!)
 */
  
-//	string GetTitle() 													-> get title for UI
-//	string GetVersion													-> get version for manage
-//	string GetDesc()													-> get detail information
-//	string GetLoginTitle()												-> get title for login dialog
-//	string GetLoginDesc()												-> get desc for login dialog
-//	string ServerCheck(string User, string Pass) 						-> server check
-//	string ServerLogin(string User, string Pass) 						-> login
-//	void ServerLogout() 												-> logout
+//	string GetTitle() 																	-> get title for UI
+//	string GetVersion																	-> get version for manage
+//	string GetDesc()																	-> get detail information
+//	string GetLoginTitle()																-> get title for login dialog
+//	string GetLoginDesc()																-> get desc for login dialog
+//	string ServerCheck(string User, string Pass) 										-> server check
+//	string ServerLogin(string User, string Pass) 										-> login
+//	void ServerLogout() 																-> logout
 //	string GetLanguages()																-> get support language
 //	string SubtitleWebSearch(string MovieFileName, dictionary MovieMetaData)			-> search subtitle bu web browser
 //	array<dictionary> SubtitleSearch(string MovieFileName, dictionary MovieMetaData)	-> search subtitle
@@ -18,112 +18,100 @@
 //	string SubtitleUpload(string MovieFileName, dictionary MovieMetaData, string SubtitleName, string SubtitleContent)	-> upload subtitle
 
 bool cookie = true;
-string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0";
-// Insert your addic7ed.com credentials(wikisubtitlesuser,wikisubtitlespass) below (you can get them from the browser cookies after you login)!
-string Header = "Referer: http://www.addic7ed.com/ \n Cookie: wikisubtitlesuser=xxxxxx; wikisubtitlespass=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;"; 
-uint64 GetHash(string FileName)
-{
-	int64 size = 0;
-	uint64 hash = 0;
-	uint64 fp = HostFileOpen(FileName);
+string UserAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.58 Safari/537.36 Vivaldi/2.1.1332.4";
+string Header = "Referer: http://www.addic7ed.com/";
+string API_URL = "http://www.addic7ed.com/";
+string API_LANGS = "|1|";
 
-	if (fp != 0)
-	{
-		size = HostFileLength(fp);
-		hash = size;
-		
-		for (int i = 0; i < 65536 / 8; i++) hash = hash + HostFileReadQWORD(fp);
-		
-		int64 ep = size - 65536;
-		if (ep < 0) ep = 0;
-		HostFileSeek(fp, ep, 0);
-		for (int i = 0; i < 65536 / 8; i++) hash = hash + HostFileReadQWORD(fp);
-		
-		HostFileClose(fp);
-	}
-	
-	return hash;
-}
-
-string API_URL = "http://www.addic7ed.com";
-
-string GetTitle()
-{
+string GetTitle() {
 	return "Addic7ed.com";
 }
 
-string GetVersion()
-{
+string GetVersion() {
 	return "1";
 }
 
-string GetDesc()
-{
+string GetDesc() {
 	return API_URL;
 }
 
-string GetLanguages()
-{
+string GetLanguages() {
 	return "en";
 }
 
-string ServerCheck(string User, string Pass)
-{
+string ServerCheck(string User, string Pass) {
 	string ret = HostUrlGetString(API_URL);
 	return "200 OK";
 }
-string version1 ;
-string hi;
-array<dictionary> SubtitleSearch(string MovieFileName, dictionary MovieMetaData)
-{
+
+array<dictionary> SubtitleSearch(string MovieFileName, dictionary MovieMetaData) {
 	array<dictionary> ret;
-	string hash = GetHash(MovieFileName);
+	
 	string title = string(MovieMetaData["title"]);
-	string country = string(MovieMetaData["country"]);
-	string year = string(MovieMetaData["year"]);
 	string seasonNumber = string(MovieMetaData["seasonNumber"]);
 	string episodeNumber = string(MovieMetaData["episodeNumber"]);
-	string url = "http://www.addic7ed.com/serie/" + title + "/" + seasonNumber + "/" + episodeNumber + "/1";
-	string text = HostUrlGetString(url, UserAgent,Header,"",cookie);
-	array<string> lines = text.split("\n");
-	for (int i = 0, len = lines.size(); i < len; i++)
-	{
-		string line = lines[i];
-		if (!line.empty())
-		{
-			int s = line.find("buttonDownload");
-			int s1 = line.find("/original");
-			if (s > 0 && s1 >0)
-			{
-				string linev = lines[i-21];
-				string linev1 = lines[i+6];
-				string linev2 = lines[i+5];
-				int v = linev.find("Version ");
-				string version = linev.substr(v + 8);
-				string version1 = version.substr(0,version.find(","));
-				hi="";
-				if  ( linev1.find("Hearing Impaired") > 0 || linev2.find("Hearing Impaired") > 0 )
-				{
-					hi=".HI";
-				}
-				string id = line.substr(s1);
-				string id1 = id.substr(0,id.find("\""));
+	
+	string showId = getShowId(title);
+	string data = FetchData("/ajax_loadShow.php?hd=undefined&hi=-1&langs=" + API_LANGS + "&show=" + showId + "&season=" + seasonNumber);
+	array<string> rows = data.split("<tr class=");
+	
+	for (int i = 0, len = rows.size(); i < len; i++) {
+		string row = rows[i];
+		array<dictionary> matches;
+		
+		if(row.find('>Download</a>') < 0) continue;
+	
+		if(HostRegExpParse(row,
+						   "<td>([^>]*)</td>\\s*" + /* 1 ?<season> */
+						   "<td>([^>]*)</td>\\s*" + /* 2 ?<episode> */
+						   "<td><a[^>]+>([^<]+)</a></td>\\s*" + /* 3 ?<title> */
+						   "<td>([^<]+)</td>\\s*" + /* 4 ?<language> */
+						   "<td[^>]*>([^<]*)</td>\\s*" + /* 5 ?<version> */
+						   "<td[^>]*>([^<]*)</td>\\s*" + /* 6 ?<completed> */
+						   "<td[^>]*>([^<]*)</td>\\s*" + /* 7 ?<hi> */
+						   "<td[^>]*>([^<]*)</td>\\s*" + /* 8 ?<corrected> */
+						   "<td[^>]*>([^<]*)</td>\\s*" + /* 9 ?<hd> */
+						   "<td[^>]*><a href=\"([^\"]*)\">Download", /* 10 ?<link> */
+						   matches)) { 
+
+			if(string(matches[2]["first"]) == episodeNumber) {
 				dictionary item;
-				item["id"] = id1;
-				item["title"] = title + ".S0" + seasonNumber + ".E0" + episodeNumber + "." + version1 + hi;
-				item["lang"] = "en";
+				item["id"] = string(matches[10]["first"]);
+				item["title"] = "S0" + string(matches[1]["first"]) + "E0" + string(matches[2]["first"]) + " " + HostUrlDecode(string(matches[3]["first"])) + " " + string(matches[5]["first"]);
+				item["lang"] = string(matches[4]["first"]);
 				item["format"] = "srt";
 				ret.insertLast(item);
 			}
-		}
+		}	
 	}
 	return ret;
 }
  
-string SubtitleDownload(string id)
-{
-	string url = "http://www.addic7ed.com" + id;
-	return HostUrlGetString(url,UserAgent,Header,"",cookie);
+string SubtitleDownload(string url) {
+	return FetchData(url);
 }
 
+string getShowId(string name) {
+	string data = FetchData("/search.php?Submit=Search&search=" + name);
+	data = data.substr(0, data.find('id="footermenu"'));
+	
+	if(data.find("/show/") > 0) {
+		return formatUInt(parseUInt(data.substr(data.find("/show/")+6)));
+	}
+	
+	if(data.find("href=\"serie/") > 0) {
+		int b = data.find("href=\"serie/") + 6;
+		int e = data.find("\"",b);
+		string data2 = FetchData(data.substr(b, e-b));
+		if(data2.find("/show/") > 0) {
+			return formatUInt(parseUInt(data2.substr(data2.find("/show/")+6)));
+		}		
+	}
+
+	return "";
+}
+
+string FetchData(string url) {
+	return HostUrlGetString(API_URL + url, UserAgent, Header, "", cookie);
+}
 
