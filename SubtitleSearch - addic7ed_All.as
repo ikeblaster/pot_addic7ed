@@ -51,6 +51,10 @@ array<dictionary> SubtitleSearch(string MovieFileName, dictionary MovieMetaData)
 	string seasonNumber = string(MovieMetaData["seasonNumber"]);
 	string episodeNumber = string(MovieMetaData["episodeNumber"]);
 	
+	if(seasonNumber == "") {
+		return ret;
+	}
+	
 	string showId = getShowId(title);
 	string data = FetchData("/ajax_loadShow.php?hd=undefined&hi=-1&langs=" + API_LANGS + "&show=" + showId + "&season=" + seasonNumber);
 	array<string> rows = data.split("<tr class=");
