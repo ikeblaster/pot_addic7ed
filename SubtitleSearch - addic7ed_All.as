@@ -56,7 +56,7 @@ array<dictionary> SubtitleSearch(string MovieFileName, dictionary MovieMetaData)
 	}
 	
 	string showId = getShowId(title);
-	string data = FetchData("/ajax_loadShow.php?hd=undefined&hi=-1&langs=" + API_LANGS + "&show=" + showId + "&season=" + seasonNumber);
+	string data = FetchData("ajax_loadShow.php?hd=undefined&hi=-1&langs=" + API_LANGS + "&show=" + showId + "&season=" + seasonNumber);
 	array<string> rows = data.split("<tr class=");
 	
 	for (int i = 0, len = rows.size(); i < len; i++) {
@@ -82,7 +82,7 @@ array<dictionary> SubtitleSearch(string MovieFileName, dictionary MovieMetaData)
 				dictionary item;
 				item["id"] = string(matches[10]["first"]);
 				item["title"] = "S0" + string(matches[1]["first"]) + "E0" + string(matches[2]["first"]) + " " + HostUrlDecode(string(matches[3]["first"])) + " " + string(matches[5]["first"]);
-				item["lang"] = string(matches[4]["first"]);
+				item["lang"] = string(matches[4]["first"]).substr(0,2);;
 				item["format"] = "srt";
 				ret.insertLast(item);
 			}
@@ -96,7 +96,7 @@ string SubtitleDownload(string url) {
 }
 
 string getShowId(string name) {
-	string data = FetchData("/search.php?Submit=Search&search=" + name);
+	string data = FetchData("search.php?Submit=Search&search=" + name);
 	data = data.substr(0, data.find('id="footermenu"'));
 	
 	if(data.find("/show/") > 0) {
